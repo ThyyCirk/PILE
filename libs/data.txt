@@ -1,0 +1,14 @@
+WENT_THROUGH_SETUP=True
+
+steps=0
+stepGoal=1000
+
+height=175
+weight=70
+age=2008
+
+Timezone=0
+UTC=none
+
+WifiSSID=CGA2121_PNxqx95
+WifiPASS=KMSpHhtXRGM6THGGsr
