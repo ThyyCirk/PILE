@@ -1,4 +1,5 @@
-import os, sys, io, time, ntptime, network, random, machine, asyncio, math
+import os, sys, io, time, ntptime, network, random, machine, math
+import uasyncio as asyncio
 import M5
 from M5 import *
 
@@ -124,16 +125,18 @@ def HomePage():
     )
     
     stepGoal_label = Widgets.Label(f"{stepCount}", 25, 220, 1.3, 0xFFFFFF, 0x000000)
-    
+
+FitnessPage_Pages_Index=0
 def FitnessPage():
-    global clock, clocklabel, stepGoal_label, weight
+    global clock, clocklabel, stepGoal_label, weight, FitnessPage_Pages_Index
+    
     M5.Lcd.clear(0x000000)
     M5.Lcd.fillRect(0, 0, M5.Lcd.width(), 20, 0xFFFFFF)
     clocklabel = Widgets.Label(clock, 0, 0, 1, 0x000000, 0xFFFFFF, Widgets.FONTS.DejaVu18)
     
     cal_deficit = weight * stepCount * 0.0005
     
-    async def fitnessRingsAnimation():
+    def fitnessRingsAnimation(): 
         l_steps = 0
         last_state = -1
 
@@ -159,23 +162,72 @@ def FitnessPage():
                 Speaker.tone(1200 * state, 35)
                 last_state = state
                 
+    def Page0():
+        global ALLOW_NEXT_PAGE, OVERRIDE_NEXT_PAGE_BTN
         
-    M5.Lcd.drawPng(
-        "/flash/res/img/Pile/PileWorkout.png",
-        27,
-        50,
-        0, 0,
-        0, 0,
-        0.6, 0.6
-    )
-    
-    asyncio.run(fitnessRingsAnimation())
+        ALLOW_NEXT_PAGE=True  
+        OVERRIDE_NEXT_PAGE_BTN=False 
+        M5.Lcd.drawPng(
+            "/flash/res/img/Pile/PileWorkout.png",
+            27,
+            50,
+            0, 0,
+            0, 0,
+            0.6, 0.6
+        )
+        
+        fitnessRingsAnimation()
 
-    stepGoal_label = Widgets.Label(f"{stepCount}/{stepGoal}", 15, 160, 1, 0x15616d, 0x000000, Widgets.FONTS.DejaVu18)
-    Widgets.Label(f"steps", 15, 180, 1, 0x15616d, 0x000000, Widgets.FONTS.DejaVu18)
+        stepGoal_label = Widgets.Label(f"{stepCount}/{stepGoal}", 15, 160, 1, 0x15616d, 0x000000, Widgets.FONTS.DejaVu18)
+        Widgets.Label(f"steps", 15, 180, 1, 0x15616d, 0x000000, Widgets.FONTS.DejaVu18)
+        
+        calc_label = Widgets.Label(f"{cal_deficit}", 15, 205, 1, 0xff7d00, 0x000000, Widgets.FONTS.DejaVu18)
+        Widgets.Label(f"calories burned", 15, 225, 0.7, 0xff7d00, 0x000000, Widgets.FONTS.DejaVu18)
+        
+    def Page1():
+        global ALLOW_NEXT_PAGE, OVERRIDE_NEXT_PAGE_BTN
+        
+        ALLOW_NEXT_PAGE=False
+        OVERRIDE_NEXT_PAGE_BTN=True 
+        M5.Lcd.drawPng(
+                    f"/flash/res/img/misc/Body.png",
+                    0,
+                    0,
+                    0, 0,
+                    0, 0,
+                    1, 1
+                )
+        
+        M5.Lcd.drawPng(
+                    f"/flash/res/img/misc/FitnessPageBtns1.png",
+                    0,
+                    205,
+                    0, 0,
+                    0, 0,
+                    1, 1
+                )
     
-    calc_label = Widgets.Label(f"{cal_deficit}", 15, 205, 1, 0xff7d00, 0x000000, Widgets.FONTS.DejaVu18)
-    Widgets.Label(f"calories burned", 15, 225, 0.7, 0xff7d00, 0x000000, Widgets.FONTS.DejaVu18)
+    FitnessPage_Pages={
+        0: Page0,
+        1: Page1
+    }
+    
+    FitnessPage_Pages[FitnessPage_Pages_Index]()
+
+def FitnessPage_ButtonClick():
+    global FitnessPage_Pages_Index
+    
+    FitnessPage_Pages_Index+=1
+    
+    if FitnessPage_Pages_Index > 1:
+        FitnessPage_Pages_Index = 0
+    
+    FitnessPage()
+    
+def FitnessPage_ButtonClick_RIGHTBTN():
+    global FitnessPage_Pages_Index, weight
+    if(FitnessPage_Pages_Index == 1):
+        keyboard(False, 3, "weight")   
 
 setupStage_Num = 0
 ageNum = time.localtime()[0] - 100
@@ -488,11 +540,13 @@ def MoodTrackerPage(confirm=False, specPage=False):
         values.sort()  # ascending order → best to worst
 
         n = len(values)
-        if n % 2 == 1:
-            median_value = values[n // 2]
-        else:
-            median_value = (values[n // 2 - 1] + values[n // 2]) / 2
-        median_mood = mood[int(round(median_value))]
+        if n > 0:
+            if n % 2 == 1:
+                median_value = values[n // 2]
+            else:
+                median_value = (values[n // 2 - 1] + values[n // 2]) / 2
+        
+        median_mood = mood[int(round(median_value))] if n > 0 else "no entries"
         
         M5.Lcd.setTextSize(1.4)
         M5.Lcd.setTextColor(0xFFFFFF, 0X000000)
@@ -745,41 +799,170 @@ def Chart(rows, cols, x=0, y=0, h=40, w=121, rowColors=None, columnColors=None, 
         if i > 0 and i < len(sortBy):
             M5.Lcd.drawLine(pos[i - 1][0], pos[i - 1][1], pos[i][0], pos[i][1], 0xAA0099)
 
+FindMyPage_LOOP_FUNCTIONS=None
+FindMyPageNum=0
 def FindMyPage():
-    global clock, clocklabel
+    global clock, clocklabel, FindMyPage_LOOP_FUNCTIONS
+
+    # --- Setup display ---
     M5.Lcd.clear(0x000000)
     M5.Lcd.fillRect(0, 0, M5.Lcd.width(), 20, 0xFFFFFF)
     clocklabel = Widgets.Label(clock, 0, 0, 1, 0x000000, 0xFFFFFF, Widgets.FONTS.DejaVu18)
-    
-    circles=[]
+
+    # --- Circle data: [radius, r, spin, angle] ---
+    circles = []
     
     pivot_x = 67
     pivot_y = 112
+
     def spawn_circle():
-        min_udalj=35
-        max_udalj=45
-        xr_pos=random.randint(min_udalj, max_udalj)
-        r=random.randint(1,5)
-        spin=0.5
-        x=pivot_x+xr_pos
-        y=pivot_y
-        deg=random.randint(-360, 360)
-        circles.append([x, y, speed, deg])
+        dist = random.randint(35, 45)      # distance from pivot
+        r = random.randint(1, 5)           # circle radius
+        spin = random.uniform(0.1, 0.5)  # degrees per frame, small = slow
+        angle = random.uniform(0, 360)     # initial angle
+        circles.append([dist, r, spin, angle])
+
+        # Draw initial circle
+        x = int(pivot_x + dist * math.cos(math.radians(angle)))
+        y = int(pivot_y + dist * math.sin(math.radians(angle)))
+        M5.Lcd.fillCircle(x, y, r, 0xFFFFFF)
+
+    def get_pos(dist, angle):
+        rad = math.radians(angle)
+        x = pivot_x + dist * math.cos(rad)
+        y = pivot_y + dist * math.sin(rad)
+        return int(x), int(y)
+
+    def intro_Animation():
+        M5.Lcd.setTextSize(2)
+        M5.Lcd.setTextColor(0xFFFFFF, 0X000000)
+        M5.Lcd.setCursor(40, 200)
+        M5.Lcd.print("Find?")
+        for c in circles:
+            dist, r, spin, angle = c
+
+            # Erase old position
+            x, y = get_pos(dist, angle)
+            M5.Lcd.fillCircle(x, y, r, 0x000000)
+
+            # Update angle
+            angle += spin
+            if angle >= 360:
+                angle -= 360
+            c[3] = angle
+
+            # Draw new position
+            x, y = get_pos(dist, angle)
+            M5.Lcd.fillCircle(x, y, r, 0xFFFFFF)
     
-    def rotate(x, y, spin, deg):
-        spin+=spin
-        if rotationSpin > 90:
-            rotationSpin = 0
+    into_called = False
+    frame = 0
+    def INTO_ARROW():
+        nonlocal into_called, frame
+        if not into_called:
+            into_called = True
+        else:
+            return 0
+        frames = [
+                    '/flash/res/img/FindMyArrowIntroAnim/1.png',
+                    '/flash/res/img/FindMyArrowIntroAnim/2.png',
+                    '/flash/res/img/FindMyArrowIntroAnim/3.png',
+                    '/flash/res/img/FindMyArrowIntroAnim/4.png',
+                    ]
+        pos=0
+        while pos < 35:
+            for c in circles:
+                dist, r, spin, angle = c
+
+                # Erase old position
+                x, y = get_pos(dist, angle)
+                if pos < 27:
+                    M5.Lcd.fillCircle(x, y, r * 2, 0x000000)
+                
+                c[0] -= 1
+                if pos > 25:
+                    c[1] += 1
+                # Update angle
+                angle += spin * 3
+                if angle >= 360:
+                    angle -= 360
+                c[3] = angle
+
+                # Draw new position
+                x, y = get_pos(dist, angle)
+                M5.Lcd.fillCircle(x, y, r, 0xFFFFFF)
+                
+            if pos >= 31:
+                M5.Lcd.drawPng(frames[frame], pivot_x - 25, pivot_y - 25)
+                frame+=1
+            pos+=1
         
-        rad = deg * spin * math.pi / 180;
-        spin+=spin
-        cosTheta = math.cos(rad)
-        sinTheta = math.sin(rad)
-        x = (cosTheta * (x - pivot_x) - sinTheta * (y - pivot_y) + pivot_x);
-        y = (sinTheta * (x - pivot_x) + cosTheta * (y - pivot_y) + pivot.Y);
+        for c in circles:
+            dist, r, spin, angle = c
+            x, y = get_pos(dist, angle)
+            M5.Lcd.fillCircle(x, y, r, 0x000000)
+            
+        M5.Lcd.drawPng('/flash/res/img/FindMyArrowIntroAnim/4.png', pivot_x - 25, pivot_y - 25)
+        FindMyPageNum=3
+    
+    def approxLocaation_animation():
+        M5.Lcd.setTextSize(2)
+        M5.Lcd.setTextColor(0xFFFFFF, 0X000000)
+        M5.Lcd.setCursor(0, 200)
+        M5.Lcd.print("Locating \nphone...")
+        
+        ax, ay, az = tuple(round(x, 3) for x in M5.Imu.getAccel())
+        
+        for c in circles:
+            dist, r, spin, angle = c
+
+            # Erase old position
+            x, y = get_pos(dist, angle)
+            M5.Lcd.fillCircle(x, y, r, 0x000000)
+            c[2] = ax
+            # Update angle
+            angle += spin
+            if angle >= 360:
+                angle -= 360
+            c[3] = angle
+
+            # Draw new position
+            x, y = get_pos(dist, angle)
+            M5.Lcd.fillCircle(x, y, r, 0xFFFFFF)
+            
+    def lookForPhone():
+        nonlocal into_called, frame
+        frame = 0
+        into_called = False
+        return 0
+    
+    FindMyPage_LOOP_FUNCTIONS = {
+        0: intro_Animation,
+        1: approxLocaation_animation,
+        2: INTO_ARROW,
+        3: lookForPhone,
+    }
+    
+    for _ in range(20):
+        spawn_circle()
+    
+def FindMyPage_LOOP_F():
+    global FindMyPageNum, FindMyPage_LOOP_FUNCTIONS
+    
+    if FindMyPageNum in FindMyPage_LOOP_FUNCTIONS:
+        FindMyPage_LOOP_FUNCTIONS[FindMyPageNum]()
+
+def FindMyPage_ButtonClick():
+    global FindMyPageNum
+    
+    if FindMyPageNum == 0:
+        FindMyPageNum = 1
+    elif FindMyPageNum == 1:
+        FindMyPageNum = 2
 
 quickOpen = False
 settings_saveFile = "/flash/libs/settings_saveFile.txt"
+QuickSettingsPage=0
 ## ime dugmeta ,(ukljucen/iskljucen, selektovan), (ukljucen funkcija, iskljucen funkcija), (AUDIO ON / AUDIO OFF)
 ## !// - Specijalni SUFIKS koji overriduje prikazivanje status settinga
 ## ? - NE CEKIRAJ SETTINGS SAVE FILE
@@ -790,10 +973,11 @@ buttons = [
     ("WiFi", [False, False], (lambda: network.WLAN(network.STA_IF).active(False), lambda: network.WLAN(network.STA_IF).active(True)), ("Settings_Audio_Enable.wav", "Settings_Default_Disable.wav")),
     ("?Power-Off!//", [False, False], (lambda: machine.deepsleep(), lambda: machine.deepsleep()), ("Settings_Audio_Enable.wav", "Settings_Default_Disable.wav")),
     ("?Reset!//", [False, False], (lambda: ResetDevice(), lambda: ResetDevice()), ("Settings_Audio_Enable.wav", "Settings_Default_Disable.wav")),
+    ("?Settings!//", [True, False], (None, None), ("Settings_Audio_Enable.wav", "Settings_Default_Disable.wav")),
 ]
 selectedIndex = 0
 def QuickSettings(skip = False):
-    global clock, clocklabel, quickOpen, lastPage, currentPage, Pages, currentPageFunc, buttons, selectedIndex
+    global quickOpen, lastPage, currentPage, Pages, currentPageFunc, buttons, selectedIndex
     
     quickOpen = not quickOpen
     if not quickOpen and not skip:
@@ -803,11 +987,8 @@ def QuickSettings(skip = False):
     else:
         lastPage = Pages[currentPage]
         currentPageFunc = 'QuickSettings'
-    
+        
     M5.Lcd.clear(0x000000)
-    M5.Lcd.fillRect(0, 0, M5.Lcd.width(), 20, 0xFFFFFF)
-    
-    clocklabel = Widgets.Label(clock, 0, 0, 1, 0x000000, 0xFFFFFF, Widgets.FONTS.DejaVu18)
     
     cols = 2
     cell_w = 70
@@ -818,15 +999,13 @@ def QuickSettings(skip = False):
         row = i // cols
 
         x_img = col * cell_w + 2
-        y_img = row * cell_h + 30   # 30 is starting y
+        y_img = row * cell_h + 10   # 30 is starting y
         
         if not str.startswith(name, "?"):
             globalStatus = int(SearchSaveFile(name, settings_saveFile))
             status = bool(globalStatus)
         else:
             name = str.replace(name, "?", "")
-            
-        print(status)
 
         st = "ON" if status else "OFF"
         sel = "_Selected" if selected else ""
@@ -867,7 +1046,6 @@ def QuickSettings_ButtonClick():
     selectedIndex += 1
     if selectedIndex >= len(buttons):
         selectedIndex = 0
-    print(selectedIndex)
     
     buttons[selectedIndex][1][1] = True
     buttons[prevIndex][1][1] = False
@@ -904,6 +1082,245 @@ def HomePage_ButtonHold():
         )
     elif currentPage == 1:
         stepGoal_label = Widgets.Label(f"{stepCount}/{stepGoal}", 15, 160, 1, 0x15616d, 0x000000, Widgets.FONTS.DejaVu18)
+
+keyboard_LOOP_FUNCTIONS=None
+keyboard_sel_func=0
+
+lowercase = [chr(i) for i in range(ord('a'), ord('z') + 1)]
+lowercase.append(" ")
+uppercase = [c.upper() for c in lowercase]
+numberkb = [str(i) for i in range(0, 10)]
+special_characters = list("!@#$%^&*()-_=+[]{}|;:'\",.<>?/`~")
+
+keybIndex=0
+keybChoices=[lowercase, uppercase, special_characters, numberkb]
+keyb=lowercase
+
+selected_character=0
+last_char=0
+
+word=""
+
+# PRESET VALUE OF KEYBOARD WHICH IT WILL USE
+# XtoSet je promenljiva koja ce dobiti promenu tu word stvar
+def keyboard(allow_different = True, preset = 0, XtoSet=None):
+    global ALLOW_SETTINGS_PAGE, ALLOW_NEXT_PAGE, OVERRIDE_NEXT_PAGE_BTN, OVERRIDE_SETTINGS_BTN, keyboard_LOOP_FUNCTIONS
+    global lastPage, currentPage, Pages, currentPageFunc
+    global keybIndex, keybChoices, keyb, word
+    
+    ALLOW_NEXT_PAGE=False
+    ALLOW_SETTINGS_PAGE=False
+    OVERRIDE_NEXT_PAGE_BTN=True
+    OVERRIDE_SETTINGS_BTN=True
+    
+    lastPage = Pages[currentPage]
+    currentPageFunc = 'keyboard'
+    
+    M5.Lcd.fillRect(0, 40, 135, 200, 0x000000)
+    M5.Lcd.fillRect(0, 0, 135, 40, 0x555555)
+    
+    selected_character=0
+    word=""
+    
+    keybIndex=preset
+    keyb=keybChoices[keybIndex]
+    
+    xInc=20
+    yInc=35
+    
+    def Load():
+        global keyb, word
+        x=0
+        y=45
+        
+        # redraw the black bg in case a new kb is drawn
+        M5.Lcd.fillRect(0, 40, 135, 200, 0x000000)
+        M5.Lcd.fillRect(0, 0, 135, 40, 0x555555)
+        
+        Widgets.Label(
+                word,
+                0,
+                10,
+                1.3,
+                0XFFFFFF,
+                0x555555,
+                Widgets.FONTS.DejaVu18
+            )
+        
+        M5.Lcd.drawPng(
+            "/flash/res/img/misc/KeyboardBtns.png",
+            0,
+            205,
+            0, 0,
+            0, 0,
+            1, 1
+        )
+        
+        for i, v in enumerate(keyb, 1):
+            Widgets.Label(
+                f"{v}",
+                x,
+                y,
+                1.3,
+                0XFFFFFF,
+                0x000000,
+                Widgets.FONTS.DejaVu18
+            )
+            x+=xInc
+            if i % 7 == 0:
+                y+=yInc
+                x=0
+        
+        selected_character=0
+        last_char=0
+        
+        UpdateChar()
+    
+    def UpdateChar():
+        global selected_character, last_char
+        global keyb
+        
+        x=0
+        y=0
+        
+        if selected_character > len(keyb) - 1:
+            selected_character = 0
+        elif selected_character < 0:
+            selected_character = len(keyb) - 1
+        
+        def calcPos(indexLocal):
+            x=0
+            y=45
+            for i in range(1, indexLocal + 1):
+                x+=xInc
+                if i % 7 == 0:
+                    y+=yInc
+                    x=0
+            return x, y
+
+        # recoloring prev pos
+        x,y = calcPos(last_char)
+        Widgets.Label(
+                f"{keyb[last_char]}",
+                x,
+                y,
+                1.3,
+                0XFFFFFF,
+                0x000000,
+                Widgets.FONTS.DejaVu18
+            )
+        # coloring this one
+        x,y = calcPos(selected_character)
+        Widgets.Label(
+                f"{keyb[selected_character]}",
+                x,
+                y,
+                1.3,
+                0XFFFFFF,
+                0xff812f,
+                Widgets.FONTS.DejaVu18
+            )
+        
+        last_char = selected_character
+    
+    def addChar():
+        global word, selected_character
+        global keyb
+        
+        char = keyb[selected_character]
+        word+=char
+        
+        Widgets.Label(
+                word,
+                0,
+                10,
+                1.3,
+                0XFFFFFF,
+                0x555555,
+                Widgets.FONTS.DejaVu18
+            )
+    
+    def rmvChar():
+        global word
+        
+        if len(word) > 0:
+            word = word[:-1]
+            
+            M5.Lcd.fillRect(0, 0, 135, 40, 0x555555)
+            
+            Widgets.Label(
+                word,
+                0,
+                10,
+                1.3,
+                0XFFFFFF,
+                0x555555,
+                Widgets.FONTS.DejaVu18
+            )
+            
+    def setKeyb():
+        global keybIndex, keybChoices, keyb
+        if allow_different:
+            keybIndex = keybIndex + 1 if keybIndex < len(keybChoices) - 1 else 0
+            
+            keyb = keybChoices[keybIndex]
+            Load()
+            
+    def setX():
+        global ALLOW_SETTINGS_PAGE, ALLOW_NEXT_PAGE, OVERRIDE_NEXT_PAGE_BTN, OVERRIDE_SETTINGS_BTN
+        global lastPage, currentPage, Pages, currentPageFunc, word
+        
+        if XtoSet is not None:
+            saved_type = type(globals()[XtoSet])
+
+            globals()[XtoSet] = saved_type(word)
+
+            if SearchSaveFile(XtoSet) is not None:
+                WriteIntoSaveFile(XtoSet, word)
+        
+        ALLOW_NEXT_PAGE=True
+        ALLOW_SETTINGS_PAGE=True 
+        OVERRIDE_NEXT_PAGE_BTN=False 
+        OVERRIDE_SETTINGS_BTN=False
+        
+        currentPageFunc = lastPage
+        globals()[lastPage]()
+        
+    keyboard_LOOP_FUNCTIONS = {
+        0: Load,
+        1: UpdateChar,
+        2: addChar,
+        3: rmvChar,
+        4: setKeyb,
+        5: setX
+    }
+    
+    Load()
+
+def keyboard_ButtonClick_RIGHTBTN():
+    global keyboard_LOOP_FUNCTIONS, selected_character
+    
+    selected_character+=1
+    
+    keyboard_LOOP_FUNCTIONS[1]()
+    
+def keyboard_ButtonHold_RIGHTBTN():
+    global keyboard_LOOP_FUNCTIONS
+    
+    keyboard_LOOP_FUNCTIONS[4]()
+    time.sleep(0.1)
+    
+def keyboard_ButtonClick_LEFTBTN():
+    global keyboard_LOOP_FUNCTIONS, selected_character
+    keyboard_LOOP_FUNCTIONS[3]()
+    
+def keyboard_ButtonClick():
+    global keyboard_LOOP_FUNCTIONS
+    keyboard_LOOP_FUNCTIONS[2]()
+    
+def keyboard_ButtonHold():
+    global keyboard_LOOP_FUNCTIONS
+    keyboard_LOOP_FUNCTIONS[5]()
 
 PageSelectedIndex=0
 pageSelectionEntered=False
@@ -1185,7 +1602,7 @@ def WriteIntoSaveFile(Name, new_value, File=saveFile):
 def acelGyroTest():
     ax, ay, az = tuple(round(x, 2) for x in M5.Imu.getAccel())
     gx, gy, gz = tuple(round(x, 2) for x in M5.Imu.getGyro())
-    print("Accel:", ax, ay, az)
+    #print("Accel:", ax, ay, az)
     print("Gyro:", gx, gy, gz)
     
     time.sleep(0.1)
@@ -1204,6 +1621,10 @@ def loop():
     M5.update()
     updateClock()
     #acelGyroTest()
+    
+    globalfunc_name = f"{currentPageFunc}_LOOP_F"
+    if globalfunc_name in globals():
+        globals()[globalfunc_name]()
     
     if stepCount >= stepGoal and not goalReached:
         Msg_Overlay(True, "You've reached\n your goal!")

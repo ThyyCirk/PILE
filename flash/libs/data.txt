@@ -3,8 +3,8 @@ WENT_THROUGH_SETUP=True
 steps=0
 stepGoal=1000
 
-height=175
-weight=70
+height=100
+weight=55
 age=2008
 
 Timezone=0
