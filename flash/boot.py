@@ -3,6 +3,9 @@
 # SPDX-License-Identifier: MIT
 # boot.py
 import esp32
+import sys
+sys.path.append('/flash/AppData')
+sys.path.append('/flash/AppData/Services')
 
 """
 boot_option:
@@ -29,6 +32,8 @@ Quick reference:
 
 NETWORK_TIMEOUT = 60
 
+exec(open("/flash/main.py").read())
+
 # Execute startup script, if not needed, delete the code below
 if __name__ == "__main__":
     from startup import startup
@@ -36,16 +41,18 @@ if __name__ == "__main__":
     import os
 
     nvs = esp32.NVS("uiflow")
+
     try:
         boot_option = nvs.get_u8("boot_option")
     except:
         boot_option = 1  # default
 
-    startup(boot_option, NETWORK_TIMEOUT)
     if boot_option != 0:  # Run main.py directly
         sync.run()
     else:
         print("Skip sync")
+        
+    startup(boot_option, NETWORK_TIMEOUT)
 
     # copy OTA update file to main.py
     # main_ota_temp.py this file name is fixed
