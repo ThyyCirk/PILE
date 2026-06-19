@@ -1,15 +1,15 @@
 WENT_THROUGH_SETUP=True
 
-steps=530
-stepGoal=1000
+steps=0
+stepGoal=0
 
-height=250
+height=0
 weight=999
-age=1926
+age=0
 
 Timezone=0
 currentDate=1_1_2026
 UTC=none
 
-WifiSSID=CGA2121_PNxqx95
-WifiPASS=KMSpHhtXRGM6THGGsr
+WifiSSID=
+WifiPASS=
