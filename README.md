@@ -3,6 +3,7 @@
 Special gadget that you can use to track your phisical and mental health,
 to journal, keep track of time, and more!
 
+[Download Latest Release](https://github.com/ThyyCirk/PILE/releases/latest)
 
 ## user file system directory structure
 
