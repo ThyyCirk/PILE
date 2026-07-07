@@ -1,0 +1,4 @@
+- With #
+
+dark blue, light blue, white, dark yellow, dark red
+#001524, #15616d, #ffecd1, #ff7d00, #78290f
