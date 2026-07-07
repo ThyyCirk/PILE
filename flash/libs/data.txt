@@ -1,0 +1,12 @@
+steps=0
+WENT_THROUGH_SETUP=True
+stepGoal=1000
+currentDate=1_1_2026
+Timezone=0
+weight=40
+WifiPASS=none
+UTC=none
+WifiSSID=none
+age=1976
+height=90
+isdeveloper=False

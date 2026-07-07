@@ -1,0 +1,2 @@
+all=['Home_Page', 'Calendar', 'FindMy', 'Fitness_page', 'MoodTracker_page']
+favourites=['Home_Page']
