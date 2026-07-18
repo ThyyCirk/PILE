@@ -1,0 +1,3 @@
+WiFi=0
+Audio=1
+Bluetooth=0
